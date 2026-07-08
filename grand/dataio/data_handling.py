@@ -13,11 +13,19 @@ import grand.dataio
 # ToDo: Ignore the warning about branches (and all the other ROOT errors :( ) for TChain until an answer in the ROOT forum
 ROOT.gErrorIgnoreLevel = ROOT.kFatal
 
-## Class holding the information about GRAND data in a directory
+# Class holding the information about GRAND data in a directory
+
+
 class DataDirectory:
     """Class holding the information about GRAND data in a directory"""
 
-    def __init__(self, dir_name: str, recursive: bool = False, analysis_level: int = -1, sim2root_structure: bool = True):
+    def __init__(
+        self,
+        dir_name: str,
+        recursive: bool = False,
+        analysis_level: int = -1,
+        sim2root_structure: bool = True,
+    ):
         """
         @param dir_name: the name of the directory to be scanned
         @param recursive: if to scan the directory recursively
@@ -35,7 +43,19 @@ class DataDirectory:
         # Get the file handle list
         self.file_handle_list = self.get_list_of_files_handles()
 
-        self.tree_file_types = ["ftruns", "ftrunrawvoltages", "ftrunshowersims", "ftrunefieldsims", "ftefields", "ftshowers", "ftshowersims", "ftvoltages", "ftadcs", "ftrawvoltages", "ftrunnoises"]
+        self.tree_file_types = [
+            "ftruns",
+            "ftrunrawvoltages",
+            "ftrunshowersims",
+            "ftrunefieldsims",
+            "ftefields",
+            "ftshowers",
+            "ftshowersims",
+            "ftvoltages",
+            "ftadcs",
+            "ftrawvoltages",
+            "ftrunnoises",
+        ]
 
         self.init_structure()
 
@@ -56,7 +76,20 @@ class DataDirectory:
 
     def __getattr__(self, name):
         """For non-existing tree files or tree parameters, return None instead of rising an exception"""
-        trees_to_check = ["trun", "trunvoltage", "trunrawvoltage", "trawvoltage", "tadc", "tvoltage", "tefield", "tshower", "trunefieldsim", "trunshowersim", "tshowersim", "trunnoise"]
+        trees_to_check = [
+            "trun",
+            "trunvoltage",
+            "trunrawvoltage",
+            "trawvoltage",
+            "tadc",
+            "tvoltage",
+            "tefield",
+            "tshower",
+            "trunefieldsim",
+            "trunshowersim",
+            "tshowersim",
+            "trunnoise",
+        ]
         if any(s in name for s in trees_to_check):
             return None
         else:
@@ -64,7 +97,9 @@ class DataDirectory:
 
     def get_list_of_files(self, recursive: bool = False):
         """Gets list of files in the directory"""
-        return sorted(glob.glob(os.path.join(self.dir_name, "*.root"), recursive=recursive))
+        return sorted(
+            glob.glob(os.path.join(self.dir_name, "*.root"), recursive=recursive)
+        )
 
     def get_list_of_files_handles(self):
         """Go through the list of files in the directory and open all of them"""
@@ -77,7 +112,10 @@ class DataDirectory:
 
         # for filename in self.file_list:
         from itertools import groupby
-        for key, filenames in groupby(sorted(self.file_list, key=split_filenames), split_filenames):
+
+        for key, filenames in groupby(
+            sorted(self.file_list, key=split_filenames), split_filenames
+        ):
             filenames = list(filenames)
             file_handle_list.append(DataFile(filenames))
 
@@ -89,44 +127,87 @@ class DataDirectory:
         # Loop through groups of files with tree types expected in the directory
         for flistname in self.tree_file_types:
             # Assign the list of files with specific tree type to the class instance
-            setattr(self, flistname, {int(Path(el.filename).name.split("_")[-2][1:]): el for el in self.file_handle_list if Path(el.filename).name.startswith(flistname[2:-1]+"_")})
+            setattr(
+                self,
+                flistname,
+                {
+                    int(Path(el.filename).name.split("_")[-2][1:]): el
+                    for el in self.file_handle_list
+                    if Path(el.filename).name.startswith(flistname[2:-1] + "_")
+                },
+            )
             max_level = -1
-            for (l, f) in getattr(self, flistname).items():
+            for l, f in getattr(self, flistname).items():
                 # Assign the file with the tree with the specific analysis level to the class instance
                 setattr(self, f"{flistname[:-1]}_l{l}", f)
                 self.file_attrs.append(f"{flistname[:-1]}_l{l}")
                 # Assign the tree with the specific analysis level to the class instance
-                setattr(self, f"{flistname[1:-1]}_l{l}", getattr(f, f"{flistname[1:-1]}_l{l}"))
-                if (l>max_level and self.analysis_level==-1) or l==self.analysis_level:
+                setattr(
+                    self,
+                    f"{flistname[1:-1]}_l{l}",
+                    getattr(f, f"{flistname[1:-1]}_l{l}"),
+                )
+                if (
+                    l > max_level and self.analysis_level == -1
+                ) or l == self.analysis_level:
                     max_level = l
                     # Assign the file with the highest or requested analysis level as default to the class instance
                     # ToDo: This may assign all files until it goes to the max level. Probably could be avoided
                     setattr(self, f"{flistname[:-1]}", f)
                     # Assign the tree with the highest or requested analysis level as default to the class instance
-                    setattr(self, f"{flistname[1:-1]}", getattr(f, f"{flistname[1:-1]}"))
+                    setattr(
+                        self, f"{flistname[1:-1]}", getattr(f, f"{flistname[1:-1]}")
+                    )
 
     # Init the instance with sim2root structure files
     def init_sim2root_structure(self):
         self.file_attrs = []
         # Loop through groups of files with tree types expected in the directory
-        for flistname in ["ftruns", "ftrunshowersims", "ftrunefieldsims", "ftefields", "ftshowers", "ftshowersims", "ftvoltages", "ftadcs", "ftrawvoltages", "ftrunnoises"]:
+        for flistname in [
+            "ftruns",
+            "ftrunshowersims",
+            "ftrunefieldsims",
+            "ftefields",
+            "ftshowers",
+            "ftshowersims",
+            "ftvoltages",
+            "ftadcs",
+            "ftrawvoltages",
+            "ftrunnoises",
+        ]:
             # Assign the list of files with specific tree type to the class instance
             # setattr(self, flistname, {int(Path(el.filename).name.split("_")[2][1:]): el for el in self.file_handle_list if Path(el.filename).name.startswith(flistname[2:-1]+"_")})
-            setattr(self, flistname, {int(Path(el.filename).name.split("_")[-2][1:]): el for el in self.file_handle_list if Path(el.filename).name.startswith(flistname[2:-1]+"_")})
+            setattr(
+                self,
+                flistname,
+                {
+                    int(Path(el.filename).name.split("_")[-2][1:]): el
+                    for el in self.file_handle_list
+                    if Path(el.filename).name.startswith(flistname[2:-1] + "_")
+                },
+            )
             max_level = -1
-            for (l, f) in getattr(self, flistname).items():
+            for l, f in getattr(self, flistname).items():
                 # Assign the file with the tree with the specific analysis level to the class instance
                 setattr(self, f"{flistname[:-1]}_l{l}", f)
                 self.file_attrs.append(f"{flistname[:-1]}_l{l}")
                 # Assign the tree with the specific analysis level to the class instance
-                setattr(self, f"{flistname[1:-1]}_l{l}", getattr(f, f"{flistname[1:-1]}_l{l}"))
-                if (l>max_level and self.analysis_level==-1) or l==self.analysis_level:
+                setattr(
+                    self,
+                    f"{flistname[1:-1]}_l{l}",
+                    getattr(f, f"{flistname[1:-1]}_l{l}"),
+                )
+                if (
+                    l > max_level and self.analysis_level == -1
+                ) or l == self.analysis_level:
                     max_level = l
                     # Assign the file with the highest or requested analysis level as default to the class instance
                     # ToDo: This may assign all files until it goes to the max level. Probably could be avoided
                     setattr(self, f"{flistname[:-1]}", f)
                     # Assign the tree with the highest or requested analysis level as default to the class instance
-                    setattr(self, f"{flistname[1:-1]}", getattr(f, f"{flistname[1:-1]}"))
+                    setattr(
+                        self, f"{flistname[1:-1]}", getattr(f, f"{flistname[1:-1]}")
+                    )
 
     # Init the instance with exp (gtot) structure files
     # ToDo: It should be the same as sim2root, but at the moment sim2root has different naming convention
@@ -134,23 +215,39 @@ class DataDirectory:
         self.file_attrs = []
         # Loop through groups of files with tree types expected in the directory
         for flistname in ["ftruns", "ftrunrawvoltages", "ftadcs", "ftrawvoltages"]:
-        # for flistname in ["ftruns", "ftrunshowersims", "ftrunefieldsims", "ftefields", "ftshowers", "ftshowersims", "ftvoltages", "ftadcs", "ftrawvoltages", "ftrunnoises"]:
+            # for flistname in ["ftruns", "ftrunshowersims", "ftrunefieldsims", "ftefields", "ftshowers", "ftshowersims", "ftvoltages", "ftadcs", "ftrawvoltages", "ftrunnoises"]:
             # Assign the list of files with specific tree type to the class instance
-            setattr(self, flistname, {int(Path(el.filename).name.split("_")[-2][1:]): el for el in self.file_handle_list if Path(el.filename).name.startswith(flistname[2:-1]+"_")})
+            setattr(
+                self,
+                flistname,
+                {
+                    int(Path(el.filename).name.split("_")[-2][1:]): el
+                    for el in self.file_handle_list
+                    if Path(el.filename).name.startswith(flistname[2:-1] + "_")
+                },
+            )
             max_level = -1
-            for (l, f) in getattr(self, flistname).items():
+            for l, f in getattr(self, flistname).items():
                 # Assign the file with the tree with the specific analysis level to the class instance
                 setattr(self, f"{flistname[:-1]}_l{l}", f)
                 self.file_attrs.append(f"{flistname[:-1]}_l{l}")
                 # Assign the tree with the specific analysis level to the class instance
-                setattr(self, f"{flistname[1:-1]}_l{l}", getattr(f, f"{flistname[1:-1]}_l{l}"))
-                if (l>max_level and self.analysis_level==-1) or l==self.analysis_level:
+                setattr(
+                    self,
+                    f"{flistname[1:-1]}_l{l}",
+                    getattr(f, f"{flistname[1:-1]}_l{l}"),
+                )
+                if (
+                    l > max_level and self.analysis_level == -1
+                ) or l == self.analysis_level:
                     max_level = l
                     # Assign the file with the highest or requested analysis level as default to the class instance
                     # ToDo: This may assign all files until it goes to the max level. Probably could be avoided
                     setattr(self, f"{flistname[:-1]}", f)
                     # Assign the tree with the highest or requested analysis level as default to the class instance
-                    setattr(self, f"{flistname[1:-1]}", getattr(f, f"{flistname[1:-1]}"))
+                    setattr(
+                        self, f"{flistname[1:-1]}", getattr(f, f"{flistname[1:-1]}")
+                    )
 
     def print(self, verbose=True):
         """Prints all the information about all the data"""
@@ -182,14 +279,24 @@ class DataDirectory:
     def get_max_list_of_events(self):
         """Gets the max list of event,run from all the trees"""
 
-        trees_to_check = ["tadc", "trawvoltage", "tvoltage", "tefield", "tshower", "tshowersim"]
+        trees_to_check = [
+            "tadc",
+            "trawvoltage",
+            "tvoltage",
+            "tefield",
+            "tshower",
+            "tshowersim",
+        ]
         # Assuming, that the lowest level tadc has the max number, and going up if it doesn't exist
         for level in range(10):
             for tree in trees_to_check:
                 if tree_inst := getattr(self, f"{tree}_l{level}"):
                     return tree_inst.get_list_of_events()
 
-## Class holding the information about GRAND TTrees in the specified file
+
+# Class holding the information about GRAND TTrees in the specified file
+
+
 class DataFile:
     """Class holding the information about GRAND TTrees in the specified file"""
 
@@ -197,27 +304,27 @@ class DataFile:
         """filename can be either a string or a ROOT.TFile"""
 
         # Need to init here, so that different instances do not share the same data
-        ## Holds all the trees in the file, by tree name
+        # Holds all the trees in the file, by tree name
         self.dict_of_trees = {}
         """Holds all the trees in the file, by tree name"""
 
-        ## Holds the list of trees in the file, but just with maximal level
+        # Holds the list of trees in the file, but just with maximal level
         self.list_of_trees = []
         """Holds the list of trees in the file, but just with maximal level"""
 
-        ## List of tree instances
+        # List of tree instances
         self.tree_instances = []
         """List of tree instances"""
 
-        ## Holds dict of tree types, each containing a dict of tree names with tree meta-data as values
+        # Holds dict of tree types, each containing a dict of tree names with tree meta-data as values
         self.tree_types = defaultdict(dict)
         """Holds dict of tree types, each containing a dict of tree names with tree meta-data as values"""
 
-        ## Does this instace hold a chain of files
+        # Does this instace hold a chain of files
         self.is_tchain = False
         """Does this instace hold a chain of files"""
 
-        ## File list in case this is a chain
+        # File list in case this is a chain
         self.flist = []
         """File list in case this is a chain"""
 
@@ -282,7 +389,7 @@ class DataFile:
                     try:
                         t.BuildIndex("run_number")
                     except:
-                        raise("Unable to build index for the tree")
+                        raise ("Unable to build index for the tree")
 
                 # Modify the number of events for this TChain
                 tree_info["evt_cnt"] = t.GetEntries()
@@ -302,17 +409,28 @@ class DataFile:
             for key1 in self.tree_types[key].keys():
                 el = self.tree_types[key][key1]
                 tree_class = getattr(grand.dataio, el["type"])
-                tree_instance = tree_class(_tree_name=self.dict_of_trees[el["name"]])
+                tree_instance = tree_class(
+                    _tree_name=self.dict_of_trees[el["name"]], _file=self.f
+                )
                 tree_instance.file = self.f
                 self.tree_instances.append(tree_instance)
                 # If there is analysis level info in the tree, attribute each level and max level
                 if "analysis_level" in el:
-                    if el["analysis_level"] > max_analysis_level or el["analysis_level"] == 0:
+                    if (
+                        el["analysis_level"] > max_analysis_level
+                        or el["analysis_level"] == 0
+                    ):
                         max_analysis_level = el["analysis_level"]
                         max_anal_tree_name = el["name"]
                         max_anal_tree_type = el["type"]
                         self.max_tree_instance = tree_instance
-                    setattr(self, tree_class.get_default_tree_name() + "_l" + str(el["analysis_level"]), tree_instance)
+                    setattr(
+                        self,
+                        tree_class.get_default_tree_name()
+                        + "_l"
+                        + str(el["analysis_level"]),
+                        tree_instance,
+                    )
                 # In case there is no analysis level info in the tree (old trees), just take the last one
                 elif max_analysis_level == -1:
                     max_anal_tree_name = el["name"]
@@ -338,7 +456,7 @@ class DataFile:
             self.list_of_trees.append(self.dict_of_trees[max_anal_tree_name])
 
     def __enter__(self):
-        """ enter() for DataFile as context manager"""
+        """enter() for DataFile as context manager"""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -353,16 +471,24 @@ class DataFile:
             print("This DataFile is a chain of the following files:")
             print(self.flist)
             print(f"The first file size: {self.f.GetSize():40}")
-            print("Most of the information below are based on the tree in the first file")
+            print(
+                "Most of the information below are based on the tree in the first file"
+            )
         else:
             print("This DataFile refers to the following file:")
             print(self.flist)
             print(f"File size: {self.f.GetSize():40}")
 
-        print(f"Tree classes found in the file: {str([el for el in self.tree_types.keys()]):40}")
+        print(
+            f"Tree classes found in the file: {
+                str([el for el in self.tree_types.keys()]):40}"
+        )
 
         for key in self.tree_types:
-            print(f"Trees of type {key:<40}: {str([el for el in self.tree_types[key].keys()]):<40}")
+            print(
+                f"Trees of type {key:<40}: {
+                    str([el for el in self.tree_types[key].keys()]):<40}"
+            )
 
         for key in self.tree_types:
             for key1 in self.tree_types[key].keys():
@@ -396,7 +522,11 @@ class DataFile:
     def _get_traces_lengths(self, tree):
         """Adds traces info to event trees"""
         # If tree is not of Event class (contains traces), do nothing
-        if not issubclass(tree.__class__, MotherEventTree) or "sim" in tree.tree_name or "zhaires" in tree.tree_name:
+        if (
+            not issubclass(tree.__class__, MotherEventTree)
+            or "sim" in tree.tree_name
+            or "zhaires" in tree.tree_name
+        ):
             return None
         else:
             traces_lengths = tree.get_traces_lengths()
@@ -405,7 +535,11 @@ class DataFile:
 
             # Check if traces have constant length
             if np.unique(np.array(traces_lengths).ravel()).size != 1:
-                logger.warning(f"Traces lengths vary through events or axes for {tree.tree_name}! {traces_lengths}")
+                logger.warning(
+                    f"Traces lengths vary through events or axes for {tree.tree_name}! {
+                        traces_lengths
+                    }"
+                )
                 return traces_lengths
             else:
                 return traces_lengths[0][0]
@@ -472,12 +606,19 @@ class DataFile:
     def get_max_list_of_events(self):
         """Gets the max list of event,run from all the trees"""
 
-        trees_to_check = ["tadc", "trawvoltage", "tvoltage", "tefield", "tshower", "tshowersim"]
+        trees_to_check = [
+            "tadc",
+            "trawvoltage",
+            "tvoltage",
+            "tefield",
+            "tshower",
+            "tshowersim",
+        ]
         # Assuming, that the lowest level tadc has the max number, and going up if it doesn't exist
         for level in range(10):
             for tree in trees_to_check:
                 try:
                     if tree_inst := getattr(self, f"{tree}_l{level}"):
-                            return tree_inst.get_list_of_events()
+                        return tree_inst.get_list_of_events()
                 except:
                     pass

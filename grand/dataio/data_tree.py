@@ -13,9 +13,10 @@ from grand.dataio import StdVectorList, StdVectorListDesc, StdString
 
 logger = getLogger(__name__)
 
-## A list of generated Trees
+# A list of generated Trees
 grand_tree_list = []
 """Internal list of generated Trees"""
+
 
 @dataclass
 class DataTree:
@@ -23,53 +24,52 @@ class DataTree:
     Mother class for GRAND Tree data classes
     """
 
-    ## File handle
+    # File handle
     _file: ROOT.TFile = None
     """File handle"""
-    ## File name
+    # File name
     _file_name: str = None
     """File name"""
-    ## Tree object
+    # Tree object
     _tree: ROOT.TTree = None
     """Tree object"""
-    ## Tree name
+    # Tree name
     _tree_name: str = ""
     """Tree name"""
-    ## Tree type
+    # Tree type
     _type: str = ""
     """Tree type"""
-    ## A list of run_numbers or (run_number, event_number) pairs in the Tree
+    # A list of run_numbers or (run_number, event_number) pairs in the Tree
     _entry_list: list = field(default_factory=list)
     """A list of run_numbers or (run_number, event_number) pairs in the Tree"""
-    ## Comment - if needed, added by user
+    # Comment - if needed, added by user
     _comment: str = ""
     """Comment - if needed, added by user"""
-    ## TTree creation date/time in UTC - a naive time, without timezone set
+    # TTree creation date/time in UTC - a naive time, without timezone set
     _creation_datetime: datetime.datetime = None
     """TTree creation date/time in UTC - a naive time, without timezone set"""
-    ## Modification history - JSON
+    # Modification history - JSON
     _modification_history: str = ""
     """Modification history - JSON"""
 
-    ## Unix creation datetime of the source tree; 0 s means no source
+    # Unix creation datetime of the source tree; 0 s means no source
     _source_datetime: datetime.datetime = None
     """Unix creation datetime of the source tree; 0 s means no source"""
-    ## The tool used to generate this tree's values from another tree
+    # The tool used to generate this tree's values from another tree
     _modification_software: str = ""
     """The tool used to generate this tree's values from another tree"""
-    ## The version of the tool used to generate this tree's values from another tree
+    # The version of the tool used to generate this tree's values from another tree
     _modification_software_version: str = ""
     """The version of the tool used to generate this tree's values from another tree"""
-    ## The analysis level of this tree
+    # The analysis level of this tree
     _analysis_level: int = 0
     """The analysis level of this tree"""
 
-    ## Is the tree read from TChain
+    # Is the tree read from TChain
     is_tchain: bool = False
     """Is the tree read from TChain"""
 
-
-    ## Fields that are not branches
+    # Fields that are not branches
     _nonbranch_fields = [
         "_nonbranch_fields",
         "_type",
@@ -88,7 +88,7 @@ class DataTree:
         "_analysis_level",
         "_modification_history",
         "__setattr__",
-        "is_tchain"
+        "is_tchain",
     ]
     """Fields that are not branches"""
 
@@ -96,10 +96,22 @@ class DataTree:
     def mod_setattr(self, key, value):
         # Create a list of attributes and properties for the class if it doesn't exist
         if not hasattr(self, "_attributes_and_properties"):
-            super().__setattr__("_attributes_and_properties", set([el1 for el in type(self).__mro__[:-1] for el1 in list(el.__dict__.keys()) + list(el.__annotations__.keys())]))
+            super().__setattr__(
+                "_attributes_and_properties",
+                set(
+                    [
+                        el1
+                        for el in type(self).__mro__[:-1]
+                        for el1 in list(el.__dict__.keys())
+                        + list(el.__annotations__.keys())
+                    ]
+                ),
+            )
         # If the attribute not in the list of class's attributes and properties, don't add it
         if key not in self._attributes_and_properties:
-            raise AttributeError(f"{key} attribute for class {type(self)} doesn't exist.")
+            raise AttributeError(
+                f"{key} attribute for class {type(self)} doesn't exist."
+            )
         super().__setattr__(key, value)
 
     @property
@@ -115,7 +127,8 @@ class DataTree:
     @type.setter
     def type(self, val: str) -> None:
         # The meta field does not exist, add it
-        if (el:=self._tree.GetUserInfo().FindObject("type")) == None:
+        el = self._tree.GetUserInfo().FindObject("type")
+        if not el:
             self._tree.GetUserInfo().Add(ROOT.TNamed("type", val))
         # The meta field exists, change the value
         else:
@@ -158,7 +171,7 @@ class DataTree:
     @comment.setter
     def comment(self, val: str) -> None:
         # The meta field does not exist, add it
-        if (el:=self._tree.GetUserInfo().FindObject("comment")) == None:
+        if (el := self._tree.GetUserInfo().FindObject("comment")) == None:
             self._tree.GetUserInfo().Add(ROOT.TNamed("comment", val))
         # The meta field exists, change the value
         else:
@@ -183,7 +196,8 @@ class DataTree:
             raise ValueError(f"Unsupported type {type(val)} for creation_datetime!")
 
         # The meta field does not exist, add it
-        if (el := self._tree.GetUserInfo().FindObject("creation_datetime")) == None:
+        el = self._tree.GetUserInfo().FindObject("creation_datetime")
+        if not el:
             self._tree.GetUserInfo().Add(ROOT.TParameter(int)("creation_datetime", val))
         # The meta field exists, change the value
         else:
@@ -199,7 +213,8 @@ class DataTree:
     @modification_history.setter
     def modification_history(self, val: str) -> None:
         # The meta field does not exist, add it
-        if (el:=self._tree.GetUserInfo().FindObject("modification_history")) == None:
+        el = self._tree.GetUserInfo().FindObject("modification_history")
+        if not el:
             self._tree.GetUserInfo().Add(ROOT.TNamed("modification_history", val))
         # The meta field exists, change the value
         else:
@@ -218,7 +233,9 @@ class DataTree:
     @source_datetime.setter
     def source_datetime(self, val: datetime.datetime) -> None:
         # Remove the existing datetime
-        self._tree.GetUserInfo().Remove(self._tree.GetUserInfo().FindObject("source_datetime"))
+        self._tree.GetUserInfo().Remove(
+            self._tree.GetUserInfo().FindObject("source_datetime")
+        )
 
         # If datetime was given
         if type(val) == datetime.datetime:
@@ -231,7 +248,8 @@ class DataTree:
             raise ValueError(f"Unsupported type {type(val)} for source_datetime!")
 
         # The meta field does not exist, add it
-        if (el:=self._tree.GetUserInfo().FindObject("source_datetime")) == None:
+        el = self._tree.GetUserInfo().FindObject("source_datetime")
+        if not el:
             self._tree.GetUserInfo().Add(ROOT.TParameter(int)("source_datetime", val))
         # The meta field exists, change the value
         else:
@@ -247,7 +265,8 @@ class DataTree:
     @modification_software.setter
     def modification_software(self, val: str) -> None:
         # The meta field does not exist, add it
-        if (el:=self._tree.GetUserInfo().FindObject("modification_software")) == None:
+        el = self._tree.GetUserInfo().FindObject("modification_software")
+        if not el:
             self._tree.GetUserInfo().Add(ROOT.TNamed("modification_software", val))
         # The meta field exists, change the value
         else:
@@ -263,8 +282,11 @@ class DataTree:
     @modification_software_version.setter
     def modification_software_version(self, val: str) -> None:
         # The meta field does not exist, add it
-        if (el:=self._tree.GetUserInfo().FindObject("modification_software_version")) == None:
-            self._tree.GetUserInfo().Add(ROOT.TNamed("modification_software_version", val))
+        el = self._tree.GetUserInfo().FindObject("modification_software_version")
+        if not el:
+            self._tree.GetUserInfo().Add(
+                ROOT.TNamed("modification_software_version", val)
+            )
         # The meta field exists, change the value
         else:
             el.SetTitle(val)
@@ -279,7 +301,8 @@ class DataTree:
     @analysis_level.setter
     def analysis_level(self, val: int) -> None:
         # The meta field does not exist, add it
-        if (el:=self._tree.GetUserInfo().FindObject("analysis_level")) == None:
+        el = self._tree.GetUserInfo().FindObject("analysis_level")
+        if not el:
             self._tree.GetUserInfo().Add(ROOT.TParameter(int)("analysis_level", val))
         # The meta field exists, change the value
         else:
@@ -314,13 +337,17 @@ class DataTree:
             self._create_tree()
 
         for field in self.__dict__:
-            if field[0] == "_" and hasattr(self, field[1:]) == False and isinstance(self.__dict__[field], StdVectorList):
+            if (
+                field[0] == "_"
+                and hasattr(self, field[1:]) == False
+                and isinstance(self.__dict__[field], StdVectorList)
+            ):
                 print("not set for", field)
 
         self.__setattr__ = weakref.proxy(self.mod_setattr)
         # self.__setattr__ = self.mod_setattr
 
-    ## Return the iterable over self
+    # Return the iterable over self
     def __iter__(self):
         """Return the iterable over self"""
         # Always start the iteration with the first entry
@@ -331,7 +358,7 @@ class DataTree:
             yield self
             current_entry += 1
 
-    ## Set the tree's file
+    # Set the tree's file
     def _set_file(self, f):
         """Set the tree's file"""
         # If the ROOT TFile is given, just use it
@@ -360,7 +387,9 @@ class DataTree:
                     else:
                         self._file = ROOT.TFile(self._file_name, "create")
         else:
-            raise ValueError(f"Unsupported filename {f}. Can't open/create a file with a tree.")
+            raise ValueError(
+                f"Unsupported filename {f}. Can't open/create a file with a tree."
+            )
 
         # If a list is given, it's a Chain
         if isinstance(f, list):
@@ -371,8 +400,8 @@ class DataTree:
             for el in f:
                 self._tree.Add(el)
 
+    # Init/readout the tree from a file
 
-    ## Init/readout the tree from a file
     def _set_tree(self, t):
         """Init/readout the tree from a file"""
         # If the ROOT TTree is given, just use it
@@ -389,7 +418,9 @@ class DataTree:
                 # There was no such tree in the file, so create one
                 if self._tree == None:
                     logger.warning(
-                        f"No valid {self._tree_name} TTree in the file {self._file.GetName()}. Creating a new one."
+                        f"No valid {self._tree_name} TTree in the file {
+                            self._file.GetName()
+                        }. Creating a new one."
                     )
                     self._create_tree()
 
@@ -400,13 +431,12 @@ class DataTree:
                 logger.info(f"creating tree {self._tree_name} {self._file}")
                 self._create_tree()
 
-
         self.assign_metadata()
 
         # Fill the runs/events numbers from the tree (important if it already existed)
         self.fill_entry_list()
 
-    ## Create the tree
+    # Create the tree
     def _create_tree(self, tree_name=""):
         """Create the tree"""
         if tree_name != "":
@@ -419,7 +449,9 @@ class DataTree:
         """Adds the current variable values as a new event to the tree"""
         pass
 
-    def write(self, *args, close_file=True, overwrite=False, force_close_file=False, **kwargs):
+    def write(
+        self, *args, close_file=True, overwrite=False, force_close_file=False, **kwargs
+    ):
         """Write the tree to the file"""
         # Add the tree friends to this tree
         self.add_proper_friends()
@@ -467,17 +499,17 @@ class DataTree:
             self._tree.SetDirectory(ROOT.nullptr)
             self._file.Close()
 
-    ## Fills the entry list from the tree
+    # Fills the entry list from the tree
     def fill_entry_list(self):
         """Fills the entry list from the tree"""
         pass
 
-    ## Check if specified run_number/event_number already exist in the tree
+    # Check if specified run_number/event_number already exist in the tree
     def is_unique_event(self):
         """Check if specified run_number/event_number already exist in the tree"""
         pass
 
-    ## Add the proper friend trees to this tree (reimplemented in daughter classes)
+    # Add the proper friend trees to this tree (reimplemented in daughter classes)
     def add_proper_friends(self):
         """Add the proper friend trees to this tree (reimplemented in daughter classes)"""
         pass
@@ -492,7 +524,15 @@ class DataTree:
         self.assign_branches()
         return res
 
-    def draw(self, varexp, selection, option="", nentries=ROOT.TTree.kMaxEntries, firstentry=0, delete_temp_histogram=True):
+    def draw(
+        self,
+        varexp,
+        selection,
+        option="",
+        nentries=ROOT.TTree.kMaxEntries,
+        firstentry=0,
+        delete_temp_histogram=True,
+    ):
         """An interface to TTree::Draw(). Allows for drawing specific TTree columns or getting their values with get_vX()."""
 
         count = self._tree.Draw(varexp, selection, option, nentries, firstentry)
@@ -505,22 +545,22 @@ class DataTree:
         return count
 
     def get_v1(self):
-        '''Get first vector of results from draw()'''
+        """Get first vector of results from draw()"""
         return self._tree.GetV1()
 
     def get_v2(self):
-        '''Get second vector of results from draw()'''
+        """Get second vector of results from draw()"""
         return self._tree.GetV2()
 
     def get_v3(self):
-        '''Get third vector of results from draw()'''
+        """Get third vector of results from draw()"""
         return self._tree.GetV3()
 
     def get_v4(self):
-        '''Get fourth vector of results from draw()'''
+        """Get fourth vector of results from draw()"""
         return self._tree.GetV4()
 
-    ## All three methods below return the number of entries
+    # All three methods below return the number of entries
     def get_entries(self):
         """Return the number of events in the tree"""
         return self._tree.GetEntries()
@@ -551,7 +591,7 @@ class DataTree:
         """Get's the current TFile the TTree is in"""
         return self._tree.GetCurrentFile()
 
-    ## Create branches of the TTree based on the class fields
+    # Create branches of the TTree based on the class fields
     def create_branches(self, set_if_exists=True):
         """Create branches of the TTree based on the class fields"""
         # Reset all branch addresses just in case
@@ -573,7 +613,7 @@ class DataTree:
             # self.create_branch_from_field(self.__dataclass_fields__[field], set_branches)
             self.create_branch_from_field(self.__dict__[field], set_branches, field)
 
-    ## Create a specific branch of a TTree computing its type from the corresponding class field
+    # Create a specific branch of a TTree computing its type from the corresponding class field
     def create_branch_from_field(self, value, set_branches=False, value_name=""):
         """Create a specific branch of a TTree computing its type from the corresponding class field"""
         # Handle numpy arrays
@@ -621,7 +661,9 @@ class DataTree:
             # Create the branch
             if not set_branches:
                 # self._tree.Branch(value_name[1:], getattr(self, value_name), value_name[1:] + val_type)
-                self._tree.Branch(branch_name, getattr(self, value_name), branch_name + val_type)
+                self._tree.Branch(
+                    branch_name, getattr(self, value_name), branch_name + val_type
+                )
             # Or set its address
             else:
                 # self._tree.SetBranchAddress(value_name[1:], getattr(self, value_name))
@@ -632,7 +674,10 @@ class DataTree:
             if getattr(self, value_name).sec_vec_type is not None:
                 # If the second vector type is the type of the branch, switch to the second vector type
                 if self._tree.GetLeaf(branch_name) != None:
-                    if getattr(self, value_name).sec_vec_type in self._tree.GetLeaf(branch_name).GetTypeName():
+                    if (
+                        getattr(self, value_name).sec_vec_type
+                        in self._tree.GetLeaf(branch_name).GetTypeName()
+                    ):
                         getattr(self, value_name).switch_to_sec_vec_type()
             # Create the branch
             if not set_branches:
@@ -642,10 +687,16 @@ class DataTree:
                 # Try to attach the branch from the tree
                 try:
                     # self._tree.SetBranchAddress(value_name[1:], getattr(self, value_name)._vector)
-                    self._tree.SetBranchAddress(branch_name, getattr(self, value_name)._vector)
+                    self._tree.SetBranchAddress(
+                        branch_name, getattr(self, value_name)._vector
+                    )
                 except:
                     # logger.warning(f"Could not find branch {value_name[1:]} in tree {self.tree_name}. This branch will not be filled.")
-                    logger.info(f"Could not find branch {branch_name} in tree {self.tree_name}. This branch will not be filled.")
+                    logger.info(
+                        f"Could not find branch {branch_name} in tree {
+                            self.tree_name
+                        }. This branch will not be filled."
+                    )
         elif type(value) == StdString:
             # Create the branch
             if not set_branches:
@@ -655,9 +706,15 @@ class DataTree:
             else:
                 # self._tree.SetBranchAddress(value.name[1:], getattr(self, value.name).string)
                 try:
-                    self._tree.SetBranchAddress(branch_name, getattr(self, value_name).string)
+                    self._tree.SetBranchAddress(
+                        branch_name, getattr(self, value_name).string
+                    )
                 except:
-                    logger.warning(f"The branch {branch_name} was not found in the source file and will not be filled.")
+                    logger.warning(
+                        f"The branch {
+                            branch_name
+                        } was not found in the source file and will not be filled."
+                    )
         elif isinstance(value, ROOT.string):
             # Create the branch
             if not set_branches:
@@ -669,11 +726,17 @@ class DataTree:
                 try:
                     self._tree.SetBranchAddress(branch_name, getattr(self, value_name))
                 except:
-                    logger.warning(f"The branch {branch_name} was not found in the source file and will not be filled.")
+                    logger.warning(
+                        f"The branch {
+                            branch_name
+                        } was not found in the source file and will not be filled."
+                    )
         else:
-            raise ValueError(f"Unsupported type {type(value)}. Can't create a branch {branch_name}.")
+            raise ValueError(
+                f"Unsupported type {type(value)}. Can't create a branch {branch_name}."
+            )
 
-    ## Assign branches to the instance - without calling it, the instance does not show the values read to the TTree
+    # Assign branches to the instance - without calling it, the instance does not show the values read to the TTree
     def assign_branches(self):
         """Assign branches to the instance - without calling it, the instance does not show the values read to the TTree"""
         # Assign the TTree branches to the class fields
@@ -682,19 +745,24 @@ class DataTree:
             if field in self._nonbranch_fields:
                 continue
             field_name = field
-            if field[0] == "_": field_name=field[1:]
+            if field[0] == "_":
+                field_name = field[1:]
             # print(field, self.__dataclass_fields__[field])
             # Read the TTree branch
             try:
                 u = getattr(self._tree, field_name)
                 # print("*", field[1:], self.__dataclass_fields__[field].name, u, type(u), id(u))
             except:
-                logger.info(f"Could not find {field_name} in tree {self.tree_name}. This field won't be assigned.")
+                logger.info(
+                    f"Could not find {field_name} in tree {
+                        self.tree_name
+                    }. This field won't be assigned."
+                )
             else:
                 # Assign the TTree branch value to the class field
                 setattr(self, field_name, u)
 
-    ## Create metadata for the tree
+    # Create metadata for the tree
     def create_metadata(self):
         """Create metadata for the tree"""
         # ToDo: stupid, because default values are generated here and in the class fields definitions. But definition of the class field does not call the setter, which is needed to attach these fields to the tree.
@@ -708,12 +776,16 @@ class DataTree:
         self.modification_software_version = ""
         self.analysis_level = 0
 
-    ## Assign metadata to the instance - without calling it, the instance does not show the metadata stored in the TTree
+    # Assign metadata to the instance - without calling it, the instance does not show the metadata stored in the TTree
     def assign_metadata(self):
         """Assign metadata to the instance - without calling it, the instance does not show the metadata stored in the TTree"""
-        metadata_count = self._tree.GetUserInfo().GetEntries()
+        user_info = self._tree.GetUserInfo()  # cache once
+        metadata_count = user_info.GetEntries()
+        print(type(self._tree))
+        print(self._tree.IsA().GetName())
+        print("entries:", self._tree.GetEntries())
         for i in range(metadata_count):
-            el = self._tree.GetUserInfo().At(i)
+            el = user_info.At(i)
             # meta as TNamed
             if type(el) == ROOT.TNamed:
                 setattr(self, el.GetName(), el.GetTitle())
@@ -721,25 +793,27 @@ class DataTree:
             else:
                 setattr(self, el.GetName(), el.GetVal())
 
-    ## Get entry with indices
+    # Get entry with indices
     def get_entry_with_index(self, run_no=0, evt_no=0):
         """Get the event with run_no and evt_no"""
         res = self._tree.GetEntryWithIndex(run_no, evt_no)
         if res == 0 or res == -1:
             logger.error(
-                f"No event with event number {evt_no} and run number {run_no} in the {self.tree_name} tree. Please provide proper numbers."
+                f"No event with event number {evt_no} and run number {run_no} in the {
+                    self.tree_name
+                } tree. Please provide proper numbers."
             )
             return 0
 
         self.assign_branches()
         return res
 
-    ## Print out the tree scheme
+    # Print out the tree scheme
     def print(self):
         """Print out the tree scheme"""
         return self._tree.Print()
 
-    ## Print the meta information
+    # Print the meta information
     def print_metadata(self):
         """Print the meta information"""
         for el in self._tree.GetUserInfo():
@@ -766,14 +840,14 @@ class DataTree:
                 val = el.GetTitle()
 
             # Convert unix time if this is the datetime
-            if "datetime" in el.GetName() and val!=0:
+            if "datetime" in el.GetName() and val != 0:
                 val = datetime.datetime.fromtimestamp(val)
 
             metadata[el.GetName()] = val
 
         return metadata
 
-    ## Copy contents of another dataclass instance of the same type to this instance
+    # Copy contents of another dataclass instance of the same type to this instance
     def copy_contents(self, source):
         """Copy contents of another dataclass instance of similar type to this instance
         The source has to have some field the same as this tree. For example EventEfieldTree and EventVoltageTree"""
@@ -785,7 +859,11 @@ class DataTree:
             try:
                 setattr(self, k[1:], getattr(source, k[1:]))
             except TypeError:
-                logger.warning(f"The type of {k} in {source.tree_name} and {self._tree_name} differs. Not copying.")
+                logger.warning(
+                    f"The type of {k} in {source.tree_name} and {
+                        self._tree_name
+                    } differs. Not copying."
+                )
 
     def get_tree_size(self):
         """Get the tree size in memory and on disk, similar to what comes from the Print()"""
