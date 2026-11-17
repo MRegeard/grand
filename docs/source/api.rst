@@ -23,6 +23,8 @@ with a table of its modules.
      - Events, antennas and showers as objects, read from files
    * - :doc:`api/analysis`
      - Reconstruction of the arrival direction, Xmax and energy
+   * - :doc:`api/recon`
+     - Deconvolution: from the voltages back to the electric field
    * - :doc:`api/basis`
      - Traces, signal processing and detector layouts
    * - :doc:`api/validate`
@@ -46,6 +48,7 @@ common names, so ``from grand import Efield2Voltage, Geodetic`` works.
    api/sim
    api/aoi
    api/analysis
+   api/recon
    api/basis
    api/validate
    api/support

@@ -21,7 +21,7 @@ from grand.dataio.consistency import check_event_trees
 from grand.basis.type_trace import ElectricField
 
 from .detector.antenna_model import AntennaModel
-from .detector.process_ant import AntennaProcessing
+from .detector.process_ant import AntennaProcessing, antenna_frame
 from .detector.rf_chain import RFChain
 from .detector.rf_chain import RFChainNut
 from .detector.rf_chain import RFChain_gaa
@@ -687,25 +687,12 @@ class Efield2Voltage:
                 "coordinate must be finite and within +-22000 km" % (du_idx, position.tolist())))
 
 
-        antenna_location = coord.LTP(
-            x=self.du_pos[du_idx, 0], #self.du_pos[du_idx, 0],    # antenna position wrt local grand coordinate
-            y=self.du_pos[du_idx, 1], #self.du_pos[du_idx, 1],    # antenna position wrt local grand coordinate
-            z=self.du_pos[du_idx, 2], #self.du_pos[du_idx, 2],    # antenna position wrt local grand coordinate
-            frame=self.evt_shower.grand_ref_frame
-            )
-        logger.debug(f"antenna_location = {antenna_location}")
+        frame = antenna_frame(self.du_pos[du_idx], self.evt_shower.grand_ref_frame)
+        logger.debug(f"antenna_frame =  {frame}")
 
-        antenna_frame = coord.LTP(
-            arg=antenna_location,
-            location=antenna_location, 
-            orientation="NWU", 
-            magnetic=True
-            )
-        logger.debug(f"antenna_frame =  {antenna_frame}")
-
-        self.ant_leff_sn = AntennaProcessing(model_leff=self.ant_model.leff_sn, pos=antenna_frame)
-        self.ant_leff_ew = AntennaProcessing(model_leff=self.ant_model.leff_ew, pos=antenna_frame)
-        self.ant_leff_z  = AntennaProcessing(model_leff=self.ant_model.leff_z , pos=antenna_frame)
+        self.ant_leff_sn = AntennaProcessing(model_leff=self.ant_model.leff_sn, pos=frame)
+        self.ant_leff_ew = AntennaProcessing(model_leff=self.ant_model.leff_ew, pos=frame)
+        self.ant_leff_z  = AntennaProcessing(model_leff=self.ant_model.leff_z , pos=frame)
         # Set array frequency
         self.ant_leff_sn.set_out_freq_mhz(self.freqs_mhz)
         self.ant_leff_ew.set_out_freq_mhz(self.freqs_mhz)

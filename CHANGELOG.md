@@ -13,6 +13,17 @@ package release does not imply a schema change, or the reverse.
 
 Work on the `dev-next` integration branch, ahead of the first tagged release.
 
+### Added
+
+- `grand.recon.deconvolution`: recovers the electric field from the voltages,
+  with a Wiener filter built on the simulation's own antenna and RF-chain models.
+  `EventDeconvolver` applies it to an AOI event; nothing is written to file.
+  Tested on one simulated ZHAireS event, not yet on other geometries or on
+  measured data.
+
+- `grand.sim.noise.galaxy.galactic_noise_psd`: the power spectrum
+  `galactic_noise` draws from.  The realizations do not change.
+
 ### Fixed
 
 - The default name of the voltage file carried the wrong analysis level when

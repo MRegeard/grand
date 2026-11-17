@@ -122,17 +122,72 @@ def galactic_noise(f_lst, size_out, freqs_mhz, nb_ant, seed=None, du_type="GP300
         print("|V| at 30, 100 and 250 MHz on unit 0, arm X:",
               np.round(np.abs(spectrum[0, 0, [0, 70, 220]]), 1), "µV")
     """
-    _validate.plausible(freqs_mhz, "freqs_mhz", "galactic_noise", "frequency_mhz")   # Hz gave all zeros (#266)
+    where = "galactic_noise"
+    size_out = _validate.as_integer(size_out, "size_out", where, minimum=1)
+    nb_ant = _validate.as_integer(nb_ant, "nb_ant", where, minimum=0)
+    v_amplitude = _rms_per_bin(f_lst, freqs_mhz, du_type, where)
+    nb_freq = v_amplitude.shape[0]
+
+    # Arrange as (port, frequency), then draw one Gaussian RMS amplitude and
+    # one independent random phase for each DU, port, and frequency bin.
+    v_amplitude = v_amplitude.T
+    rng = np.random.default_rng(seed)
+    amp = rng.normal(
+        loc=0.0,
+        scale=v_amplitude[np.newaxis, ...],
+        size=(nb_ant, 3, nb_freq),
+    )
+    phase = 2.0 * np.pi * rng.random(size=(nb_ant, 3, nb_freq))
+
+    # Interior positive-frequency rFFT bins. For a backward-normalized irFFT,
+    # a conjugate pair contributes RMS sqrt(2)*|X_k|/N in the time domain.
+    # Therefore a requested per-bin RMS sigma requires |X_k| = N*sigma/sqrt(2).
+    v_complex = (
+        np.abs(amp * size_out / np.sqrt(2.0))
+        * np.exp(1j * phase)
+    )
+
+    # On a complete rFFT grid (the Efield2Voltage production use case), DC and
+    # Nyquist are self-conjugate real coefficients and do not have a conjugate
+    # partner. Their coefficient normalization is therefore N*sigma. Galactic
+    # noise is zero at DC for the present 30--250 MHz tables, but handle it
+    # generically. For odd N there is no Nyquist bin.
+    if nb_freq == size_out // 2 + 1:
+        v_complex[:, :, 0] = amp[:, :, 0] * size_out
+        if size_out % 2 == 0:
+            v_complex[:, :, -1] = amp[:, :, -1] * size_out
+
+    return v_complex
+
+
+def _rms_per_bin(f_lst, freqs_mhz, du_type, where):
+    r"""The expected RMS open-circuit voltage in each frequency bin, before any draw.
+
+    Parameters
+    ----------
+    f_lst : float
+        Local sidereal time in hours, ``0 <= f_lst < 24``.
+    freqs_mhz : ndarray, shape (nb_freq,)
+        Uniformly spaced frequency grid, in MHz.
+    du_type : str
+        Antenna model: ``"GP300"``, ``"GP300_nec"`` or ``"GP300_mat"``.
+    where : str
+        The function to name in error messages.
+
+    Returns
+    -------
+    ndarray, shape (nb_freq, 3)
+        RMS voltage per bin and antenna port, in microvolts; zero outside the
+        30--250 MHz of the tables.
+    """
+    _validate.plausible(freqs_mhz, "freqs_mhz", where, "frequency_mhz")   # Hz gave all zeros (#266)
     # The Galactic-noise tables sample LST every 20 minutes (72 bins/24 h).
     # Select the nearest available bin. Integer-hour values map exactly, e.g.
     # f_lst=18.0 -> bin 54 -> LST 18:00.
-    where = "galactic_noise"
     f_lst = _validate.as_real(f_lst, "f_lst", where)
     if not 0.0 <= f_lst < 24.0:
         raise ValueError(_validate.message(
             where, "'f_lst' (local sidereal time) must satisfy 0 <= f_lst < 24 hours, got %s" % f_lst))
-    size_out = _validate.as_integer(size_out, "size_out", where, minimum=1)
-    nb_ant = _validate.as_integer(nb_ant, "nb_ant", where, minimum=0)
     freqs_mhz = _validate.as_array(freqs_mhz, "freqs_mhz", where, ndim=1, min_length=2, finite=True)
     _validate.non_negative(freqs_mhz, "freqs_mhz", where, "MHz")
     lst_bin = int(np.floor(3.0 * f_lst + 0.5)) % 72
@@ -230,33 +285,51 @@ def galactic_noise(f_lst, size_out, freqs_mhz, nb_ant, seed=None, du_type="GP300
     if np.any(v_amplitude < 0.0):
         raise ValueError("Interpolated Galactic-noise RMS amplitudes must be non-negative.")
 
-    # Arrange as (port, frequency), then draw one Gaussian RMS amplitude and
-    # one independent random phase for each DU, port, and frequency bin.
-    v_amplitude = v_amplitude.T
-    rng = np.random.default_rng(seed)
-    amp = rng.normal(
-        loc=0.0,
-        scale=v_amplitude[np.newaxis, ...],
-        size=(nb_ant, 3, nb_freq),
-    )
-    phase = 2.0 * np.pi * rng.random(size=(nb_ant, 3, nb_freq))
+    return v_amplitude
 
-    # Interior positive-frequency rFFT bins. For a backward-normalized irFFT,
-    # a conjugate pair contributes RMS sqrt(2)*|X_k|/N in the time domain.
-    # Therefore a requested per-bin RMS sigma requires |X_k| = N*sigma/sqrt(2).
-    v_complex = (
-        np.abs(amp * size_out / np.sqrt(2.0))
-        * np.exp(1j * phase)
-    )
 
-    # On a complete rFFT grid (the Efield2Voltage production use case), DC and
-    # Nyquist are self-conjugate real coefficients and do not have a conjugate
-    # partner. Their coefficient normalization is therefore N*sigma. Galactic
-    # noise is zero at DC for the present 30--250 MHz tables, but handle it
-    # generically. For odd N there is no Nyquist bin.
-    if nb_freq == size_out // 2 + 1:
-        v_complex[:, :, 0] = amp[:, :, 0] * size_out
+def galactic_noise_psd(f_lst, size_out, freqs_mhz, du_type="GP300"):
+    r"""The power spectrum :func:`galactic_noise` draws its realizations from.
+
+    Parameters
+    ----------
+    f_lst : float
+        Local sidereal time in hours. Must satisfy ``0 <= f_lst < 24``.
+    size_out : int
+        Length, in samples, of the time trace the spectrum belongs to.
+    freqs_mhz : ndarray, shape (nb_freq,)
+        Uniformly spaced frequency grid, in MHz, as for :func:`galactic_noise`.
+    du_type : str, optional
+        Antenna model: ``"GP300"`` (HFSS), ``"GP300_nec"`` (NEC) or
+        ``"GP300_mat"`` (MATLAB).
+
+    Returns
+    -------
+    ndarray, shape (nb_freq, 3)
+        Expected squared modulus of the rFFT coefficients of the open-circuit
+        voltage, per antenna port, in squared microvolts.  Zero outside the
+        30--250 MHz of the tables, where the model says nothing.
+
+    Examples
+    --------
+    .. jupyter-execute::
+
+        import numpy as np
+        from grand.sim.noise.galaxy import galactic_noise_psd
+
+        freqs_mhz = np.arange(0.0, 1001.0)
+        psd = galactic_noise_psd(18.0, 2000, freqs_mhz)
+        print(psd.shape)                                     # (frequencies, ports)
+        print("first and last bins with a value:", np.flatnonzero(psd[:, 0])[[0, -1]], "MHz")
+    """
+    where = "galactic_noise_psd"
+    size_out = _validate.as_integer(size_out, "size_out", where, minimum=1)
+    v_amplitude = _rms_per_bin(f_lst, freqs_mhz, du_type, where)
+    # The coefficients of galactic_noise: N*sigma/sqrt(2) in the interior bins,
+    # N*sigma in the self-conjugate ones of a complete rFFT grid.
+    psd = (size_out * v_amplitude) ** 2 / 2.0
+    if v_amplitude.shape[0] == size_out // 2 + 1:
+        psd[0] *= 2.0
         if size_out % 2 == 0:
-            v_complex[:, :, -1] = amp[:, :, -1] * size_out
-
-    return v_complex
+            psd[-1] *= 2.0
+    return psd

@@ -191,7 +191,7 @@ Where next
 * :doc:`recipes`: short code for the common tasks, from reading a shower to
   reconstructing its direction, including the RF chain and the Galactic noise
   on their own.
-* :doc:`notebooks`: twelve notebooks that work through each part of the
+* :doc:`notebooks`: thirteen notebooks that work through each part of the
   library with figures.
 * :doc:`datamodel`: the trees, what they hold and how they fit together.
 * :doc:`troubleshooting`: what to do when a number looks wrong.

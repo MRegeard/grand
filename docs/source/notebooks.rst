@@ -59,6 +59,9 @@ The notebooks
 `12. The event viewer <https://github.com/grand-mother/grand/blob/dev-next/notebooks/12_event_viewer.ipynb>`_
    Running ``examples/eventviewer/`` and what each of its panels shows.
 
+`13. Deconvolution <https://github.com/grand-mother/grand/blob/dev-next/notebooks/13_deconvolution.ipynb>`_
+   ``grand.recon.deconvolution``: the electric field recovered from the voltages, unit by unit and for a whole AOI event.
+
 .. note::
 
    Notebook 07 needs SRTM elevation tiles, which are not in version control.

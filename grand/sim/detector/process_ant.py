@@ -31,6 +31,24 @@ class MissingFrameError(ValueError):
     """Error class"""
 
 
+def antenna_frame(position, grand_frame):
+    r"""Returns the local frame of an antenna: NWU at its position, magnetic north.
+
+    Parameters
+    ----------
+    position : array_like, shape (3,)
+        Antenna position, in m, in `grand_frame`.
+    grand_frame : GRANDCS
+        The array's frame, as ``ShowerEvent.grand_ref_frame``.
+
+    Returns
+    -------
+    LTP
+    """
+    location = LTP(x=position[0], y=position[1], z=position[2], frame=grand_frame)
+    return LTP(arg=location, location=location, orientation="NWU", magnetic=True)
+
+
 @document_fields
 @dataclass
 class PreComputeInterpol:
@@ -194,6 +212,35 @@ class AntennaProcessing:
         ndarray, shape (3, n_freq)
             Effective length per antenna arm, in the frequency domain.
         """
+        theta_efield, phi_efield = self.source_direction(xmax)
+        # frequency [Hz] with padding
+        if self.size_fft == 0:
+            # case without init before call effective_length
+            logger.warning(
+                "Run AntennaProcessing.init_interpolation() only once per event.\
+                Define output frequency before calling effective_length by calling set_out_freq_mhz()"
+            )
+            freq_out = sf.rfftfreq(efield.get_nb_sample(), efield.get_delta_time_s()) * 1e-6
+            self.set_out_freq_mhz(freq_out)
+            # frequency in MHz
+            AntennaProcessing.init_interpolation(self.model_leff.frequency * 1e-6, freq_out)
+        return self.leff_in_direction(theta_efield, phi_efield, frame)
+
+    def source_direction(self, xmax: LTP):
+        """
+        Direction of the source, seen from the antenna.
+
+        Parameters
+        ----------
+        xmax : LTP
+            Position of the source.
+
+        Returns
+        -------
+        theta_efield, phi_efield : ndarray
+            Zenith and azimuth in the antenna frame, in degrees.  Also kept as
+            attributes of the same names.
+        """
         # 'frame' is shower frame. 'self.frame' is antenna frame.
         if isinstance(xmax, LTP):
             # shower frame --> antenna frame
@@ -225,6 +272,31 @@ class AntennaProcessing:
             np.ravel(phi_efield)[0], np.ravel(theta_efield)[0]
         )
         # logger.debug(f"{theta_efield.r}")
+        return theta_efield, phi_efield
+
+    def leff_in_direction(self, theta_efield, phi_efield, frame: Union[LTP, GRANDCS]):
+        """
+        Effective length of this arm for a source in a given direction.
+
+        It is the single evaluation of the response: the forward simulation
+        and the deconvolution (:mod:`grand.recon.deconvolution`) both go
+        through it.  The output frequencies must be set first, with
+        :meth:`set_out_freq_mhz` and :meth:`init_interpolation`.
+
+        Parameters
+        ----------
+        theta_efield, phi_efield : ndarray
+            Zenith and azimuth of the source in the antenna frame, in degrees,
+            as :meth:`source_direction` returns them.
+        frame : LTP or GRANDCS
+            Frame to express the result in.
+
+        Returns
+        -------
+        ndarray, shape (3, n_freq)
+            Effective length, in the components of `frame`.  It has no component
+            along the direction of the source.
+        """
         # Interpolate using a tri-linear interpolation in (f, phi, theta)
         # table store antenna response
         # delta theta in degree
@@ -267,24 +339,6 @@ class AntennaProcessing:
             ip1 = 0
         rp1 -= np.floor(rp1)
         rp0 = 1 - rp1
-        # fft
-        # logger.info(efield.e_xyz.info())
-        e_xyz = efield.e_xyz
-        logger.debug(f"e_xyz.shape:{e_xyz.shape}")
-        # Leff ref frequency  [Hz]
-        freq_ref_hz = self.model_leff.frequency
-        # frequency [Hz] with padding
-        if self.size_fft == 0:
-            # case without init before call effective_length
-            logger.warning(
-                "Run AntennaProcessing.init_interpolation() only once per event.\
-                Define output frequency before calling effective_length by calling set_out_freq_mhz()"
-            )
-            freq_out = sf.rfftfreq(efield.get_nb_sample(), efield.get_delta_time_s()) * 1e-6
-            self.set_out_freq_mhz(freq_out)
-            # frequency in MHz
-            AntennaProcessing.init_interpolation(freq_ref_hz * 1e-6, freq_out)
-
         logger.debug(f"size_fft={self.size_fft}")
         # interpolation Leff theta and phi on sphere
         leff = self.model_leff.leff_theta_reim
@@ -305,7 +359,8 @@ class AntennaProcessing:
         if not in_table:
             leff_itp_sph = np.zeros_like(leff_itp_sph)
         # interpolation Leff theta and phi on frequency
-        pre = AntennaProcessing.pre_cpt
+        # Through self: an instance may hold its own grid (see DetectorResponse)
+        pre = self.pre_cpt
         leff_itp = (
             pre.c_inf * leff_itp_sph[:, pre.idx_itp] + pre.c_sup * leff_itp_sph[:, pre.idx_itp + 1]
         )
@@ -329,11 +384,30 @@ class AntennaProcessing:
         # TODO: there might be an easier way to do this.
         # vector wrt ECEF frame. AntennaProcessing --> ECEF
         self.leff_frame_ant = np.array([self.l_x, self.l_y, self.l_z])
-        leff_frame_ecef = np.matmul(self.pos.basis.T, self.leff_frame_ant)
-        # vector wrt shower frame. ECEF --> Shower
-        self.leff_frame_shower = np.matmul(frame.basis, leff_frame_ecef)
+        self.leff_frame_shower = self.antenna_to_frame(self.leff_frame_ant, frame)
         self.leff_frame_ant_sph = np.array([self.l_t, self.l_p])
         return self.leff_frame_shower
+
+    def antenna_to_frame(self, vector, frame: Union[LTP, GRANDCS]):
+        """
+        Rotates vectors from the antenna frame to `frame`, through ECEF.
+
+        Parameters
+        ----------
+        vector : ndarray, shape (3, ...)
+            Components in the antenna frame.
+        frame : LTP or GRANDCS
+            Frame to express them in.
+
+        Returns
+        -------
+        ndarray, shape (3, ...)
+            Components in `frame`.
+        """
+        # vector wrt ECEF frame. AntennaProcessing --> ECEF
+        vector_ecef = np.matmul(self.pos.basis.T, vector)
+        # vector wrt shower frame. ECEF --> Shower
+        return np.matmul(frame.basis, vector_ecef)
 
     def compute_voltage(
         self,
